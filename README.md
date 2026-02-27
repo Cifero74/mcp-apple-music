@@ -160,7 +160,7 @@ Once connected, you can ask Claude:
 
 ## Authors
 
-Built by **[Mario Inghilleri](https://github.com/marioinghilleri)** and **[Claude](https://claude.ai)** (Anthropic) as part of a personal MCP ecosystem for Claude Desktop.
+Built by **[Cifero74](https://github.com/Cifero74)** and **[Claude](https://claude.ai)** (Anthropic) as part of a personal MCP ecosystem for Claude Desktop.
 
 This project was conceived, designed, debugged, and shipped entirely through a collaborative conversation between Mario and Claude — from API research and auth flow design, through the setup wizard, to live testing with a real Apple Music library.
 
