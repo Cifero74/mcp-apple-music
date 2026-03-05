@@ -6,6 +6,10 @@
 
 An **MCP (Model Context Protocol) server** that gives Claude full access to your Apple Music account — search the catalog, browse your personal library, manage playlists, and explore your listening history and recommendations.
 
+<a href="https://glama.ai/mcp/servers/@Cifero74/mcp-apple-music">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/@Cifero74/mcp-apple-music/badge" alt="mcp-apple-music MCP server" />
+</a>
+
 > **Ask Claude things like:**
 > - *"Based on what I've been listening to lately, recommend 15 songs I don't have yet and add them to a new playlist"*
 > - *"Show me all my playlists and tell me which artists appear most"*
