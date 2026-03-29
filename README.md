@@ -13,6 +13,10 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 
 ---
 
+## Hosted deployment
+
+A hosted deployment is available on [Fronteir AI](https://fronteir.ai/mcp/cifero74-mcp-apple-music).
+
 ## Features
 
 | Tool | Description |
