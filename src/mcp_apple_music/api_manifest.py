@@ -125,6 +125,61 @@ EXPECTED_CATEGORIES = frozenset(
     }
 )
 
+ENDPOINT_TOOL_MAP = {
+    "catalog_resource_get": "get_catalog_resource",
+    "catalog_resource_multiple": "get_catalog_resources",
+    "catalog_resource_relationship": "get_catalog_relationship",
+    "catalog_resource_view": "get_catalog_view",
+    "catalog_albums_by_upc": "get_catalog_resources_by_filter",
+    "catalog_songs_by_isrc": "get_catalog_resources_by_filter",
+    "catalog_music_videos_by_isrc": "get_catalog_resources_by_filter",
+    "catalog_equivalent_ids": "get_equivalent_catalog_ids",
+    "catalog_charts_playlists": "get_catalog_playlist_charts",
+    "catalog_live_radio_stations": "get_live_radio_stations",
+    "catalog_personal_station": "get_personal_station",
+    "catalog_station_genres_all": "get_station_genres",
+    "search_catalog": "search_catalog",
+    "search_catalog_hints": "get_catalog_search_hints",
+    "search_catalog_suggestions": "get_catalog_search_suggestions",
+    "search_library": "search_library",
+    "library_resource_get": "get_library_resource",
+    "library_resource_multiple": "get_library_resources",
+    "library_resource_all": "get_library_resources_all",
+    "library_resource_relationship": "get_library_relationship",
+    "library_add_resource": "add_resources_to_library",
+    "library_playlist_folder_root": "get_root_library_playlist_folder",
+    "library_playlist_folder_create": "create_playlist_folder",
+    "library_playlist_create": "create_playlist",
+    "library_playlist_add_tracks": "add_tracks_to_playlist",
+    "ratings_catalog_get": "get_resource_rating",
+    "ratings_catalog_multiple": "get_resource_ratings",
+    "ratings_catalog_add": "set_resource_rating",
+    "ratings_catalog_delete": "delete_resource_rating",
+    "ratings_library_get": "get_resource_rating",
+    "ratings_library_multiple": "get_resource_ratings",
+    "ratings_library_add": "set_resource_rating",
+    "ratings_library_delete": "delete_resource_rating",
+    "genres_catalog_get": "get_catalog_resource",
+    "genres_catalog_multiple": "get_catalog_resources",
+    "genres_catalog_all": "get_catalog_genres",
+    "charts_catalog": "get_catalog_charts",
+    "favorites_add_resource": "add_resources_to_favorites",
+    "replay_user_data": "get_replay",
+    "recommendations_get": "get_recommendation",
+    "recommendations_relationship": "get_recommendation_relationship",
+    "recommendations_multiple": "get_recommendations",
+    "recommendations_default": "get_recommendations",
+    "history_heavy_rotation": "get_heavy_rotation",
+    "history_recently_played_resources": "get_recently_played",
+    "history_recently_played_tracks": "get_recently_played_tracks",
+    "history_recently_played_stations": "get_recently_played_stations",
+    "history_recently_added_resources": "get_recently_added_resources",
+    "multi_resource_catalog_typed_ids": "get_multiple_catalog_resources",
+    "multi_resource_library_typed_ids": "get_multiple_library_resources",
+    "essentials_user_storefront": "get_user_storefront",
+    "essentials_connectivity_test": "test_apple_music_api_connectivity",
+}
+
 
 def all_endpoints() -> tuple[Endpoint, ...]:
     return ENDPOINTS
@@ -147,3 +202,11 @@ def get_endpoint(key: str) -> Endpoint:
 
 def coverage_summary() -> dict[str, int]:
     return {category: len(endpoints_by_category(category)) for category in sorted(EXPECTED_CATEGORIES)}
+
+
+def tool_for_endpoint(endpoint: Endpoint) -> str | None:
+    return endpoint.tool or ENDPOINT_TOOL_MAP.get(endpoint.key)
+
+
+def endpoint_tool_map() -> dict[str, str]:
+    return {endpoint.key: tool for endpoint in ENDPOINTS if (tool := tool_for_endpoint(endpoint))}

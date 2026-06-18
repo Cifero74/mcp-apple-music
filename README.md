@@ -6,7 +6,7 @@ mcp-name: io.github.Cifero74/mcp-apple-music
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![MCP](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io)
 
-An **MCP (Model Context Protocol) server** that gives Claude full access to your Apple Music account — search the catalog, browse your personal library, manage playlists, and explore your listening history and recommendations.
+An **MCP (Model Context Protocol) server** that gives agents broad Apple Music API access — search the catalog, browse your personal library, manage playlists and playlist folders, work with ratings/favorites, and explore listening history, Replay, storefront, and recommendations.
 
 > **Ask Claude things like:**
 > - *"Based on what I've been listening to lately, recommend 15 songs I don't have yet and add them to a new playlist"*
@@ -17,19 +17,20 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 
 ## Features
 
-| Tool | Description |
+Tools return structured responses by default so agents can safely compose IDs,
+pagination, request metadata, and raw Apple responses. Most read tools also
+accept `format="text"` for compact human summaries.
+
+| Area | Highlights |
 |---|---|
-| `search_catalog` | Search Apple Music catalog (songs, albums, artists, playlists) |
-| `search_library` | Search within your personal library |
-| `get_library_songs` | List songs saved in your library (paginated) |
-| `get_library_albums` | List albums in your library (paginated) |
-| `get_library_artists` | List artists in your library |
-| `get_library_playlists` | List all your playlists with IDs |
-| `get_playlist_tracks` | Get tracks inside a specific playlist |
-| `create_playlist` | Create a new playlist |
-| `add_tracks_to_playlist` | Add songs to a playlist (library or catalog tracks) |
-| `get_recently_played` | See recently played albums/playlists/stations |
-| `get_recommendations` | Get personalised Apple Music picks |
+| Catalog | One/multiple resource lookup, relationship fetches, views, typed multi-resource lookup, UPC/ISRC filters, equivalent IDs |
+| Search | Catalog search, search hints, search suggestions, and library search across documented resource types |
+| Genres, charts, stations | Catalog genres, charts, playlist charts, station genres, live radio stations, personal station |
+| Library | One/multiple/all resource lookup, relationships, typed multi-resource lookup, compatibility wrappers for songs/albums/artists/playlists |
+| Playlists | Create playlists, add tracks with batching and dry-run, create playlist folders, inspect playlist tracks |
+| Personalization | Ratings, favorites, Replay, recommendations, heavy rotation, recently played resources/tracks/stations, recently added resources, user storefront |
+
+See [`docs/api-coverage.md`](docs/api-coverage.md) for the full endpoint-to-tool coverage map.
 
 ---
 
@@ -132,10 +133,14 @@ mcp-apple-music/
 │   └── mcp_apple_music/
 │       ├── __init__.py
 │       ├── auth.py      — Developer Token generation + User Token management
-│       ├── client.py    — Async HTTP client for api.music.apple.com
-│       ├── server.py    — FastMCP server with all 11 tools
+│       ├── api_manifest.py — Auditable Apple Music endpoint coverage manifest
+│       ├── client.py       — Async HTTP client for api.music.apple.com
+│       ├── responses.py    — Structured response and API error helpers
+│       ├── server.py       — FastMCP server bootstrap
+│       ├── tools/          — Catalog, search, library, playlist, and personalization tools
 │       └── setup.py     — One-time setup wizard (browser-based OAuth)
 ├── config.example.json  — Example config structure (no secrets)
+├── docs/api-coverage.md — Endpoint family and tool coverage notes
 ├── pyproject.toml
 └── README.md
 ```
@@ -158,6 +163,9 @@ Once connected, you can ask Claude:
 
 "Create a playlist called 'Rainy Sunday' with the 10 most mellow tracks
  you can find from my library."
+
+"I exported my 2008 Last.fm scrobbles. Match those tracks in Apple Music,
+ dry-run the playlist body, then create a playlist and add the resolved songs."
 ```
 
 ---
