@@ -18,6 +18,9 @@ env/
 # uv
 .uv/
 
+# Local git worktrees
+.worktrees/
+
 # Secrets — never commit these!
 *.p8
 config.json
