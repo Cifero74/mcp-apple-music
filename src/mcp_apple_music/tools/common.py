@@ -53,8 +53,12 @@ def paging_params(
     return clean_params(params)
 
 
+def _relationship_data(ids: str | list[str] | None, resource_type: str) -> list[dict[str, str]]:
+    return [{"id": item_id, "type": resource_type} for item_id in split_values(ids)]
+
+
 def relationship_body(ids: str | list[str], resource_type: str) -> dict[str, Any]:
-    return {"data": [{"id": item_id, "type": resource_type} for item_id in split_values(ids)]}
+    return {"data": _relationship_data(ids, resource_type)}
 
 
 def attributes_body(**attributes: Any) -> dict[str, Any]:
@@ -67,10 +71,10 @@ def with_relationship(
     resource_type: str,
     ids: str | list[str] | None,
 ) -> dict[str, Any]:
-    values = split_values(ids)
-    if values:
+    data = _relationship_data(ids, resource_type)
+    if data:
         body.setdefault("relationships", {})[relationship] = {
-            "data": [{"id": item_id, "type": resource_type} for item_id in values]
+            "data": data
         }
     return body
 
@@ -79,20 +83,20 @@ def operation_report(
     *,
     operation: str,
     path: str,
+    method: str = "POST",
     attempted_ids: list[str] | None = None,
     dry_run: bool = False,
     request_body: dict[str, Any] | None = None,
     responses: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     attempted = attempted_ids or []
+    request: dict[str, Any] = {"method": method.upper(), "path": path}
+    if request_body is not None:
+        request["body"] = request_body
     return {
         "operation": operation,
         "dry_run": dry_run,
-        "request": {
-            "method": "POST",
-            "path": path,
-            "body": request_body or {},
-        },
+        "request": request,
         "attempted": {
             "count": len(attempted),
             "ids": attempted,

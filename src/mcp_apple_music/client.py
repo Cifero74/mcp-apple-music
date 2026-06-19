@@ -56,6 +56,21 @@ class AppleMusicClient:
         """
         return await self.request("POST", path, body=body, user_auth=True)
 
+    async def post_many(self, path: str, bodies: list[dict]) -> list[dict]:
+        """POST several request bodies to one path while reusing one HTTP client."""
+        responses: list[dict] = []
+        async with self._client_factory() as client:
+            for body in bodies:
+                response = await self._send_with_client(
+                    client,
+                    "POST",
+                    path,
+                    body=body,
+                    user_auth=True,
+                )
+                responses.append(response.json() if response.content else {})
+        return responses
+
     async def put(
         self,
         path: str,
@@ -104,19 +119,37 @@ class AppleMusicClient:
         body: Optional[dict] = None,
         user_auth: bool = True,
     ) -> httpx.Response:
+        async with self._client_factory() as client:
+            return await self._send_with_client(
+                client,
+                method,
+                path,
+                params=params,
+                body=body,
+                user_auth=user_auth,
+            )
+
+    async def _send_with_client(
+        self,
+        client: httpx.AsyncClient,
+        method: str,
+        path: str,
+        params: Optional[dict[str, Any]] = None,
+        body: Optional[dict] = None,
+        user_auth: bool = True,
+    ) -> httpx.Response:
         headers = self.auth.get_auth_headers() if user_auth else self.auth.get_catalog_headers()
         if method.upper() in {"POST", "PUT"}:
             headers = {**headers, "Content-Type": "application/json"}
 
-        async with self._client_factory() as client:
-            response = await client.request(
-                method.upper(),
-                f"{BASE_URL}{path}",
-                headers=headers,
-                params=clean_params(params),
-                json=body if body is not None else None,
-                timeout=TIMEOUT,
-            )
+        response = await client.request(
+            method.upper(),
+            f"{BASE_URL}{path}",
+            headers=headers,
+            params=clean_params(params),
+            json=body if body is not None else None,
+            timeout=TIMEOUT,
+        )
 
         if response.is_error:
             raise error_from_response(method, path, response)

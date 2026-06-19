@@ -7,6 +7,7 @@ from typing import Any
 from .common import (
     ClientGetter,
     attributes_body,
+    clamp,
     operation_report,
     relationship_body,
     require_values,
@@ -15,6 +16,9 @@ from .common import (
 )
 
 PLAYLIST_TRACK_TYPES = ("songs", "library-songs")
+DUPLICATE_HANDLING_NOTE = (
+    "Apple Music API behavior controls duplicates unless the caller prefetches playlist tracks."
+)
 
 
 def register_playlist_tools(mcp: Any, get_client: ClientGetter) -> None:
@@ -64,40 +68,25 @@ def register_playlist_tools(mcp: Any, get_client: ClientGetter) -> None:
         """Add catalog songs or library songs to a library playlist with safe batching."""
         track_kind = validate_choice(track_type, PLAYLIST_TRACK_TYPES, "track_type")
         ids = require_values(track_ids, "track_ids")
-        size = min(max(1, int(batch_size)), 100)
+        size = clamp(batch_size, 1, 100)
         path = f"/me/library/playlists/{playlist_id}/tracks"
         batches = [ids[index : index + size] for index in range(0, len(ids), size)]
         request_bodies = [relationship_body(batch, track_kind) for batch in batches]
+        responses = [] if dry_run else await get_client().post_many(path, request_bodies)
+        request_body = {"batches": request_bodies} if dry_run else None
 
-        if dry_run:
-            return {
-                **operation_report(
-                    operation="add_tracks_to_playlist",
-                    path=path,
-                    attempted_ids=ids,
-                    dry_run=True,
-                    request_body={"batches": request_bodies},
-                ),
-                "batch_size": size,
-                "batch_count": len(batches),
-                "duplicate_handling": "Apple Music API behavior controls duplicates unless the caller prefetches playlist tracks.",
-            }
-
-        responses = []
-        client = get_client()
-        for body in request_bodies:
-            responses.append(await client.post(path, body))
         return {
             **operation_report(
                 operation="add_tracks_to_playlist",
                 path=path,
                 attempted_ids=ids,
-                request_body={"batches": request_bodies},
+                dry_run=dry_run,
+                request_body=request_body,
                 responses=responses,
             ),
             "batch_size": size,
             "batch_count": len(batches),
-            "duplicate_handling": "Apple Music API behavior controls duplicates unless the caller prefetches playlist tracks.",
+            "duplicate_handling": DUPLICATE_HANDLING_NOTE,
         }
 
     @mcp.tool()

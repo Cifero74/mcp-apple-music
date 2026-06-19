@@ -73,6 +73,26 @@ def test_post_includes_user_token_and_content_type():
     assert b"Mix" in seen["body"]
 
 
+def test_post_many_reuses_request_helper_for_each_body():
+    bodies = []
+
+    def handler(request):
+        bodies.append(request.content)
+        return json_response({"data": [{"id": str(len(bodies))}]})
+
+    client = client_for(handler)
+    payloads = run(
+        client.post_many(
+            "/me/library/playlists/p.1/tracks",
+            [{"data": [{"id": "1"}]}, {"data": [{"id": "2"}]}],
+        )
+    )
+
+    assert payloads == [{"data": [{"id": "1"}]}, {"data": [{"id": "2"}]}]
+    assert b'"1"' in bodies[0]
+    assert b'"2"' in bodies[1]
+
+
 def test_errors_preserve_status_and_body():
     def handler(request):
         return json_response(

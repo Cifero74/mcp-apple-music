@@ -1,21 +1,6 @@
-import asyncio
-
 import pytest
 
-from mcp_apple_music.tools import register_tools
-
-from tests.fakes import FakeClient, FakeMCP
-
-
-def build_tools():
-    fake_mcp = FakeMCP()
-    client = FakeClient()
-    register_tools(fake_mcp, lambda: client)
-    return fake_mcp.tools, client
-
-
-def run(coro):
-    return asyncio.run(coro)
+from tests.fakes import build_tools, run
 
 
 def test_catalog_resource_uses_storefront_and_catalog_auth():

@@ -94,27 +94,23 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         path = f"/me/ratings/{segment}/{resource_id}"
         body = _rating_body(rating)
         if dry_run:
-            return {
-                **operation_report(
-                    operation="set_resource_rating",
-                    path=path,
-                    attempted_ids=[resource_id],
-                    dry_run=True,
-                    request_body=body,
-                ),
-                "request": {"method": "PUT", "path": path, "body": body},
-            }
-        response = await get_client().put(path, body)
-        return {
-            **operation_report(
+            return operation_report(
                 operation="set_resource_rating",
                 path=path,
+                method="PUT",
                 attempted_ids=[resource_id],
+                dry_run=True,
                 request_body=body,
-                responses=[response],
-            ),
-            "request": {"method": "PUT", "path": path, "body": body},
-        }
+            )
+        response = await get_client().put(path, body)
+        return operation_report(
+            operation="set_resource_rating",
+            path=path,
+            method="PUT",
+            attempted_ids=[resource_id],
+            request_body=body,
+            responses=[response],
+        )
 
     @mcp.tool()
     async def delete_resource_rating(
@@ -127,25 +123,21 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         segment = _rating_segment(domain, resource_type)
         path = f"/me/ratings/{segment}/{resource_id}"
         if dry_run:
-            return {
-                **operation_report(
-                    operation="delete_resource_rating",
-                    path=path,
-                    attempted_ids=[resource_id],
-                    dry_run=True,
-                ),
-                "request": {"method": "DELETE", "path": path},
-            }
-        response = await get_client().delete(path)
-        return {
-            **operation_report(
+            return operation_report(
                 operation="delete_resource_rating",
                 path=path,
+                method="DELETE",
                 attempted_ids=[resource_id],
-                responses=[response],
-            ),
-            "request": {"method": "DELETE", "path": path},
-        }
+                dry_run=True,
+            )
+        response = await get_client().delete(path)
+        return operation_report(
+            operation="delete_resource_rating",
+            path=path,
+            method="DELETE",
+            attempted_ids=[resource_id],
+            responses=[response],
+        )
 
     @mcp.tool()
     async def add_resources_to_favorites(
