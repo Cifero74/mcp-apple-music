@@ -5,7 +5,14 @@ from __future__ import annotations
 from typing import Any
 
 from ..api_manifest import CATALOG_RESOURCE_TYPES, LIBRARY_RESOURCE_TYPES
-from .common import ClientGetter, csv_param, maybe_text, paging_params, storefront_or_default
+from .common import (
+    ClientGetter,
+    csv_param,
+    maybe_text,
+    paging_params,
+    path_segment,
+    storefront_or_default,
+)
 
 DEFAULT_CATALOG_SEARCH_TYPES = "songs,albums,artists,playlists"
 DEFAULT_LIBRARY_SEARCH_TYPES = "library-songs,library-albums,library-artists,library-playlists"
@@ -35,7 +42,7 @@ def register_search_tools(mcp: Any, get_client: ClientGetter) -> None:
         )
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/search",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/search",
             params=params,
             user_auth=False,
         )
@@ -62,7 +69,7 @@ def register_search_tools(mcp: Any, get_client: ClientGetter) -> None:
         )
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/search/hints",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/search/hints",
             params=params,
             user_auth=False,
         )
@@ -89,7 +96,7 @@ def register_search_tools(mcp: Any, get_client: ClientGetter) -> None:
         )
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/search/suggestions",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/search/suggestions",
             params=params,
             user_auth=False,
         )

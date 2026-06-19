@@ -11,11 +11,28 @@ from typing import Any, Optional
 import httpx
 
 from .auth import AppleMusicAuth
-from .responses import clean_params, error_from_response, structured_response
+from .responses import AppleMusicAPIError, clean_params, error_from_response, structured_response
 
 BASE_URL = "https://api.music.apple.com/v1"
 TIMEOUT = 30.0
 ClientFactory = Callable[[], httpx.AsyncClient]
+
+
+def _ids_from_body_or_params(
+    body: dict[str, Any] | None,
+    params: dict[str, Any] | None,
+) -> list[str]:
+    if body and isinstance(body.get("data"), list):
+        return [
+            str(item.get("id"))
+            for item in body["data"]
+            if isinstance(item, dict) and item.get("id")
+        ]
+    ids: list[str] = []
+    for key, value in clean_params(params).items():
+        if key.startswith("ids["):
+            ids.extend(str(part).strip() for part in str(value).split(",") if str(part).strip())
+    return ids
 
 
 class AppleMusicClient:
@@ -49,12 +66,13 @@ class AppleMusicClient:
         self,
         path: str,
         body: Optional[dict] = None,
+        params: Optional[dict[str, Any]] = None,
     ) -> dict:
         """POST request (always requires user auth).
 
         Returns an empty dict for 204 No Content responses.
         """
-        return await self.request("POST", path, body=body, user_auth=True)
+        return await self.request("POST", path, params=params, body=body, user_auth=True)
 
     async def post_many(self, path: str, bodies: list[dict]) -> list[dict]:
         """POST several request bodies to one path while reusing one HTTP client."""
@@ -70,6 +88,67 @@ class AppleMusicClient:
                 )
                 responses.append(response.json() if response.content else {})
         return responses
+
+    async def post_many_outcomes(
+        self,
+        path: str,
+        bodies: list[dict | None],
+        params_list: list[dict[str, Any] | None] | None = None,
+    ) -> list[dict[str, Any]]:
+        """POST batches and preserve partial success details if a later batch fails."""
+        outcomes: list[dict[str, Any]] = []
+        async with self._client_factory() as client:
+            for index, body in enumerate(bodies):
+                params = params_list[index] if params_list else None
+                request = {
+                    "method": "POST",
+                    "path": path,
+                    "params": clean_params(params),
+                    "body": body,
+                }
+                attempted_ids = _ids_from_body_or_params(body, params)
+                try:
+                    response = await self._send_with_client(
+                        client,
+                        "POST",
+                        path,
+                        params=params,
+                        body=body,
+                        user_auth=True,
+                    )
+                except AppleMusicAPIError as error:
+                    outcomes.append(
+                        {
+                            "batch_index": index,
+                            "success": False,
+                            "status_code": error.status_code,
+                            "request": request,
+                            "attempted": {
+                                "count": len(attempted_ids),
+                                "ids": attempted_ids,
+                            },
+                            "error": {
+                                "message": error.message,
+                                "body": error.body,
+                            },
+                        }
+                    )
+                    break
+                payload = response.json() if response.content else {}
+                outcomes.append(
+                    {
+                        "batch_index": index,
+                        "success": True,
+                        "status_code": response.status_code,
+                        "request": request,
+                        "attempted": {
+                            "count": len(attempted_ids),
+                            "ids": attempted_ids,
+                        },
+                        "response": payload,
+                    }
+                )
+        return outcomes
 
     async def put(
         self,

@@ -11,7 +11,8 @@ from .common import (
     maybe_text,
     operation_report,
     paging_params,
-    relationship_body,
+    path_segment,
+    require_values,
     validate_choice,
 )
 
@@ -44,9 +45,9 @@ def _rating_segment(domain: str, resource_type: str) -> str:
 
 
 def _rating_body(value: int) -> dict[str, Any]:
-    if value not in {-1, 0, 1}:
-        raise ValueError("rating must be -1, 0, or 1")
-    return {"attributes": {"value": value}}
+    if value not in {-1, 1}:
+        raise ValueError("rating must be -1 or 1; use delete_resource_rating to remove a rating.")
+    return {"type": "ratings", "attributes": {"value": value}}
 
 
 def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
@@ -59,7 +60,10 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
     ) -> dict[str, Any] | str:
         """Get the user's rating for one catalog or library resource."""
         segment = _rating_segment(domain, resource_type)
-        path = f"/me/ratings/{segment}/{resource_id}"
+        path = (
+            f"/me/ratings/{path_segment(segment, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}"
+        )
         payload = await get_client().request_structured("GET", path, user_auth=True)
         return maybe_text(payload, format, title=f"Rating {segment}:{resource_id}")
 
@@ -72,7 +76,7 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
     ) -> dict[str, Any] | str:
         """Get the user's ratings for multiple catalog or library resources."""
         segment = _rating_segment(domain, resource_type)
-        path = f"/me/ratings/{segment}"
+        path = f"/me/ratings/{path_segment(segment, 'resource_type')}"
         payload = await get_client().request_structured(
             "GET",
             path,
@@ -89,9 +93,12 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         rating: int,
         dry_run: bool = False,
     ) -> dict[str, Any]:
-        """Set a catalog or library resource rating. Rating must be -1, 0, or 1."""
+        """Set a catalog or library resource rating. Rating must be -1 or 1."""
         segment = _rating_segment(domain, resource_type)
-        path = f"/me/ratings/{segment}/{resource_id}"
+        path = (
+            f"/me/ratings/{path_segment(segment, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}"
+        )
         body = _rating_body(rating)
         if dry_run:
             return operation_report(
@@ -121,7 +128,10 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
     ) -> dict[str, Any]:
         """Delete a catalog or library resource rating."""
         segment = _rating_segment(domain, resource_type)
-        path = f"/me/ratings/{segment}/{resource_id}"
+        path = (
+            f"/me/ratings/{path_segment(segment, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}"
+        )
         if dry_run:
             return operation_report(
                 operation="delete_resource_rating",
@@ -148,38 +158,44 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         """Add catalog or library resources to the user's favorites."""
         resource = validate_choice(resource_type, FAVORITE_CHOICES, "resource_type")
         path = "/me/favorites"
-        body = relationship_body(ids, resource)
-        attempted = [item["id"] for item in body["data"]]
+        attempted = require_values(ids, "ids")
+        params = {f"ids[{resource}]": ",".join(attempted)}
         if dry_run:
             return operation_report(
                 operation="add_resources_to_favorites",
                 path=path,
                 attempted_ids=attempted,
                 dry_run=True,
-                request_body=body,
+                request_params=params,
             )
-        response = await get_client().post(path, body)
+        response = await get_client().post(path, params=params)
         return operation_report(
             operation="add_resources_to_favorites",
             path=path,
             attempted_ids=attempted,
-            request_body=body,
+            request_params=params,
             responses=[response],
         )
 
     @mcp.tool()
     async def get_replay(
         period: str | None = None,
+        year: str | None = None,
         language: str | None = None,
         limit: int = 25,
         offset: int = 0,
         format: str = "structured",
     ) -> dict[str, Any] | str:
         """Get Apple Music Replay data for the user."""
-        params = paging_params(limit=limit, offset=offset, max_limit=100, period=period, l=language)
+        params = paging_params(
+            limit=limit,
+            offset=offset,
+            max_limit=100,
+            **{"filter[year]": year or period, "l": language},
+        )
         payload = await get_client().request_structured(
             "GET",
-            "/me/replay",
+            "/me/music-summaries",
             params=params,
             user_auth=True,
         )
@@ -194,10 +210,15 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         format: str = "structured",
     ) -> dict[str, Any] | str:
         """Get one Apple Music recommendation by ID."""
-        params = paging_params(limit=limit, offset=offset, max_limit=100, include=csv_param(include))
+        params = paging_params(
+            limit=limit,
+            offset=offset,
+            max_limit=100,
+            include=csv_param(include),
+        )
         payload = await get_client().request_structured(
             "GET",
-            f"/me/recommendations/{recommendation_id}",
+            f"/me/recommendations/{path_segment(recommendation_id, 'recommendation_id')}",
             params=params,
             user_auth=True,
         )
@@ -215,7 +236,10 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         params = paging_params(limit=limit, offset=offset, max_limit=100)
         payload = await get_client().request_structured(
             "GET",
-            f"/me/recommendations/{recommendation_id}/{relationship}",
+            (
+                f"/me/recommendations/{path_segment(recommendation_id, 'recommendation_id')}/"
+                f"{path_segment(relationship, 'relationship')}"
+            ),
             params=params,
             user_auth=True,
         )
@@ -301,7 +325,7 @@ def register_personalization_tools(mcp: Any, get_client: ClientGetter) -> None:
         params = paging_params(limit=limit, offset=offset, max_limit=100)
         payload = await get_client().request_structured(
             "GET",
-            "/me/recent/played/stations",
+            "/me/recent/radio-stations",
             params=params,
             user_auth=True,
         )

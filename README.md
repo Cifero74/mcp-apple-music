@@ -19,7 +19,9 @@ An **MCP (Model Context Protocol) server** that gives agents broad Apple Music A
 
 Tools return structured responses by default so agents can safely compose IDs,
 pagination, request metadata, and raw Apple responses. Most read tools also
-accept `format="text"` for compact human summaries.
+accept `format="text"` for compact human summaries. Write tools support
+`dry_run` where useful and return resumable operation reports with succeeded,
+failed, and pending IDs for batched playlist/library work.
 
 | Area | Highlights |
 |---|---|

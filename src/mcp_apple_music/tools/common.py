@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from typing import Any
+from urllib.parse import quote
 
 from ..client import AppleMusicClient
 from ..responses import clean_params
@@ -24,6 +25,34 @@ def split_values(value: str | list[str] | tuple[str, ...] | None) -> list[str]:
 def csv_param(value: str | list[str] | tuple[str, ...] | None) -> str | None:
     values = split_values(value)
     return ",".join(values) if values else None
+
+
+def path_segment(value: str, label: str) -> str:
+    """Encode one dynamic URL path segment without allowing dot segments."""
+    segment = str(value).strip()
+    if not segment:
+        raise ValueError(f"{label} must include a value.")
+    if segment in {".", ".."}:
+        raise ValueError(f"{label} cannot be a dot segment.")
+    return quote(segment, safe="")
+
+
+def typed_ids_params(
+    typed_ids: str | list[str],
+    *,
+    choices: tuple[str, ...],
+    label: str = "typed_ids",
+) -> dict[str, str]:
+    params: dict[str, list[str]] = {}
+    for item in require_values(typed_ids, label):
+        resource_type, separator, item_id = item.partition(":")
+        resource_type = resource_type.strip()
+        item_id = item_id.strip()
+        if not separator or not resource_type or not item_id:
+            raise ValueError(f"{label} entries must use resource_type:id.")
+        validate_choice(resource_type, choices, "resource_type")
+        params.setdefault(f"ids[{resource_type}]", []).append(item_id)
+    return {key: ",".join(values) for key, values in params.items()}
 
 
 def clamp(value: int, minimum: int, maximum: int) -> int:
@@ -86,27 +115,73 @@ def operation_report(
     method: str = "POST",
     attempted_ids: list[str] | None = None,
     dry_run: bool = False,
+    request_params: dict[str, Any] | None = None,
     request_body: dict[str, Any] | None = None,
     responses: list[dict[str, Any]] | None = None,
+    batch_outcomes: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     attempted = attempted_ids or []
     request: dict[str, Any] = {"method": method.upper(), "path": path}
+    if request_params is not None:
+        request["params"] = clean_params(request_params)
     if request_body is not None:
         request["body"] = request_body
+    batches = batch_outcomes or []
+    failed_batches = [batch for batch in batches if batch.get("success") is False]
+    succeeded_ids = [
+        item_id
+        for batch in batches
+        if batch.get("success") is True
+        for item_id in batch.get("attempted", {}).get("ids", [])
+    ]
+    failed_ids = [
+        item_id
+        for batch in failed_batches
+        for item_id in batch.get("attempted", {}).get("ids", [])
+    ]
+    pending_ids = attempted[len(succeeded_ids) + len(failed_ids) :] if failed_batches else []
+    status = "dry_run" if dry_run else "partial_failure" if failed_batches else "ok"
     return {
         "operation": operation,
+        "success": not failed_batches,
+        "status": status,
         "dry_run": dry_run,
         "request": request,
         "attempted": {
             "count": len(attempted),
             "ids": attempted,
         },
+        "succeeded": {
+            "count": len(succeeded_ids) if batches else (0 if dry_run else len(attempted)),
+            "ids": succeeded_ids if batches else ([] if dry_run else attempted),
+        },
+        "failed": {
+            "count": len(failed_ids),
+            "ids": failed_ids,
+        },
+        "pending": {
+            "count": len(pending_ids),
+            "ids": pending_ids,
+        },
         "responses": responses or [],
+        "batches": batches,
+        "next_action": (
+            "No request was sent; review the request and rerun with dry_run=False."
+            if dry_run
+            else "Do not retry the full operation; retry only failed and pending IDs."
+            if failed_batches
+            else "Operation accepted by Apple Music."
+        ),
     }
 
 
 def as_text_resource_list(payload: dict[str, Any], title: str) -> str:
     rows = payload.get("data") or payload.get("raw", {}).get("data") or []
+    if not rows:
+        results = payload.get("results") or payload.get("raw", {}).get("results") or {}
+        for group in results.values():
+            if isinstance(group, dict):
+                rows.extend(group.get("data") or [])
     if not rows:
         return f"{title}: no results."
     lines = [f"{title}: {len(rows)} result(s)"]

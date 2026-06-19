@@ -10,7 +10,9 @@ from .common import (
     csv_param,
     maybe_text,
     paging_params,
+    path_segment,
     storefront_or_default,
+    typed_ids_params,
     validate_choice,
 )
 
@@ -33,7 +35,11 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         resource = validate_choice(resource_type, CATALOG_CHOICES, "resource_type")
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/{resource}/{resource_id}"
+        path = (
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/"
+            f"{path_segment(resource, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}"
+        )
         params = {"include": csv_param(include), "l": language}
         payload = await client.request_structured("GET", path, params=params, user_auth=False)
         return maybe_text(payload, format, title=f"Catalog {resource}")
@@ -51,7 +57,10 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         resource = validate_choice(resource_type, CATALOG_CHOICES, "resource_type")
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/{resource}"
+        path = (
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/"
+            f"{path_segment(resource, 'resource_type')}"
+        )
         params = {"ids": ids, "include": csv_param(include), "l": language}
         payload = await client.request_structured("GET", path, params=params, user_auth=False)
         return maybe_text(payload, format, title=f"Catalog {resource}")
@@ -73,7 +82,10 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
             raise ValueError(f"{resource} filter_name must be {valid_filter!r}")
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/{resource}"
+        path = (
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/"
+            f"{path_segment(resource, 'resource_type')}"
+        )
         params = {
             f"filter[{valid_filter}]": filter_values,
             "include": csv_param(include),
@@ -97,7 +109,12 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         resource = validate_choice(resource_type, CATALOG_CHOICES, "resource_type")
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/{resource}/{resource_id}/{relationship}"
+        path = (
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/"
+            f"{path_segment(resource, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}/"
+            f"{path_segment(relationship, 'relationship')}"
+        )
         params = paging_params(limit=limit, offset=offset, max_limit=100, l=language)
         payload = await client.request_structured("GET", path, params=params, user_auth=False)
         return maybe_text(payload, format, title=f"Catalog {resource} {relationship}")
@@ -117,7 +134,12 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         resource = validate_choice(resource_type, CATALOG_VIEW_CHOICES, "resource_type")
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/{resource}/{resource_id}/view/{view}"
+        path = (
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/"
+            f"{path_segment(resource, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}/view/"
+            f"{path_segment(view, 'view')}"
+        )
         params = paging_params(limit=limit, offset=offset, max_limit=100, l=language)
         payload = await client.request_structured("GET", path, params=params, user_auth=False)
         return maybe_text(payload, format, title=f"Catalog {resource} view {view}")
@@ -134,7 +156,11 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         resource = validate_choice(resource_type, EQUIVALENT_CHOICES, "resource_type")
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/{resource}/{resource_id}/equivalents"
+        path = (
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/"
+            f"{path_segment(resource, 'resource_type')}/"
+            f"{path_segment(resource_id, 'resource_id')}/equivalents"
+        )
         payload = await client.request_structured(
             "GET",
             path,
@@ -168,7 +194,7 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         )
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/charts",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/charts",
             params=params,
             user_auth=False,
         )
@@ -188,7 +214,7 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         params = paging_params(limit=limit, offset=offset, max_limit=50, l=language)
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/playlists/charts",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/playlists/charts",
             params=params,
             user_auth=False,
         )
@@ -214,7 +240,7 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         )
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/stations",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/stations",
             params=params,
             user_auth=False,
         )
@@ -232,7 +258,7 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         """Get all or selected station genres."""
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        path = f"/catalog/{storefront_id}/station-genres"
+        path = f"/catalog/{path_segment(storefront_id, 'storefront')}/station-genres"
         params = paging_params(
             limit=limit,
             offset=offset,
@@ -264,7 +290,7 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         )
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}/genres",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}/genres",
             params=params,
             user_auth=False,
         )
@@ -281,10 +307,14 @@ def register_catalog_tools(mcp: Any, get_client: ClientGetter) -> None:
         """Get multiple catalog resources by typed IDs such as songs:123,albums:456."""
         client = get_client()
         storefront_id = storefront_or_default(client, storefront)
-        params = {"ids": typed_ids, "include": csv_param(include), "l": language}
+        params = {
+            **typed_ids_params(typed_ids, choices=CATALOG_CHOICES),
+            "include": csv_param(include),
+            "l": language,
+        }
         payload = await client.request_structured(
             "GET",
-            f"/catalog/{storefront_id}",
+            f"/catalog/{path_segment(storefront_id, 'storefront')}",
             params=params,
             user_auth=False,
         )

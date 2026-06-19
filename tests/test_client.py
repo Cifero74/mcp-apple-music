@@ -73,6 +73,22 @@ def test_post_includes_user_token_and_content_type():
     assert b"Mix" in seen["body"]
 
 
+def test_post_can_send_query_params_without_body():
+    seen = {}
+
+    def handler(request):
+        seen["url"] = request.url
+        seen["body"] = request.content
+        return json_response({}, status_code=202)
+
+    client = client_for(handler)
+    payload = run(client.post("/me/library", params={"ids[songs]": "1,2"}))
+
+    assert payload == {}
+    assert dict(seen["url"].params) == {"ids[songs]": "1,2"}
+    assert seen["body"] == b""
+
+
 def test_post_many_reuses_request_helper_for_each_body():
     bodies = []
 
@@ -93,6 +109,33 @@ def test_post_many_reuses_request_helper_for_each_body():
     assert b'"2"' in bodies[1]
 
 
+def test_post_many_outcomes_preserves_partial_failure():
+    calls = []
+
+    def handler(request):
+        calls.append(request)
+        if len(calls) == 2:
+            return json_response({"errors": [{"detail": "Slow down"}]}, status_code=429)
+        return json_response({}, status_code=202)
+
+    client = client_for(handler)
+    outcomes = run(
+        client.post_many_outcomes(
+            "/me/library/playlists/p.1/tracks",
+            [
+                {"data": [{"id": "1", "type": "library-songs"}]},
+                {"data": [{"id": "2", "type": "library-songs"}]},
+                {"data": [{"id": "3", "type": "library-songs"}]},
+            ],
+        )
+    )
+
+    assert [outcome["success"] for outcome in outcomes] == [True, False]
+    assert outcomes[0]["attempted"]["ids"] == ["1"]
+    assert outcomes[1]["attempted"]["ids"] == ["2"]
+    assert outcomes[1]["error"]["message"] == "Slow down"
+
+
 def test_errors_preserve_status_and_body():
     def handler(request):
         return json_response(
@@ -105,6 +148,7 @@ def test_errors_preserve_status_and_body():
     with pytest.raises(AppleMusicAPIError) as error:
         run(client.get("/me/library/songs"))
 
+    assert isinstance(error.value, httpx.HTTPStatusError)
     assert error.value.status_code == 403
     assert error.value.method == "GET"
     assert error.value.path == "/me/library/songs"

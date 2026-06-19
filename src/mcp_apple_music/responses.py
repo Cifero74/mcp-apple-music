@@ -2,20 +2,41 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
+import httpx
 
-@dataclass(frozen=True)
-class AppleMusicAPIError(Exception):
-    method: str
-    path: str
-    status_code: int
-    message: str
-    body: Any | None = None
+
+class AppleMusicAPIError(httpx.HTTPStatusError):
+    """HTTP error with stable Apple Music request metadata."""
+
+    def __init__(
+        self,
+        *,
+        method: str,
+        path: str,
+        status_code: int,
+        message: str,
+        body: Any | None = None,
+        response: httpx.Response | None = None,
+    ) -> None:
+        self.method = method.upper()
+        self.path = path
+        self.status_code = status_code
+        self.message = message
+        self.body = body
+        request = getattr(response, "request", None) or httpx.Request(
+            self.method,
+            f"https://api.music.apple.com/v1{path}",
+        )
+        self.response = response or httpx.Response(status_code, request=request)
+        super().__init__(self._formatted_message(), request=request, response=self.response)
+
+    def _formatted_message(self) -> str:
+        return f"{self.method} {self.path} failed with HTTP {self.status_code}: {self.message}"
 
     def __str__(self) -> str:
-        return f"{self.method} {self.path} failed with HTTP {self.status_code}: {self.message}"
+        return self._formatted_message()
 
 
 def clean_params(params: dict[str, Any] | None) -> dict[str, Any]:
@@ -58,6 +79,7 @@ def error_from_response(method: str, path: str, response: Any) -> AppleMusicAPIE
         status_code=response.status_code,
         message=message,
         body=body,
+        response=response,
     )
 
 

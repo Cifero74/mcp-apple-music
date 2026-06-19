@@ -49,17 +49,20 @@ Read tools return structured dictionaries by default:
 ```
 
 Most read tools accept `format="text"` for compact human-readable summaries.
-Side-effect tools return operation reports with the attempted IDs, request body,
-dry-run status, API responses, and batching metadata when relevant.
+Side-effect tools return operation reports with the attempted IDs, canonical
+request path/params/body, dry-run status, accepted API responses, batching
+metadata, and explicit `succeeded`, `failed`, and `pending` ID groups when a
+later batch fails.
 
 ## Side Effects
 
 The write surface is intentionally explicit:
 
 - `create_playlist` supports `dry_run`, optional initial tracks, and optional parent playlist folder.
-- `add_tracks_to_playlist` supports `dry_run` and batches requests at up to 100 tracks.
+- `add_tracks_to_playlist` supports `dry_run` and batches requests at up to 100 tracks. If a later batch fails, the report preserves earlier successes and tells callers to retry only failed and pending IDs.
 - `create_playlist_folder` supports `dry_run`.
-- `add_resources_to_library`, `add_resources_to_favorites`, `set_resource_rating`, and `delete_resource_rating` all return structured operation reports.
+- `add_resources_to_library` and `add_resources_to_favorites` use Apple's `ids[{resource_type}]` query parameters and reject blank ID input before sending a request.
+- `set_resource_rating` writes only documented like/dislike values (`1` or `-1`); use `delete_resource_rating` to remove a rating.
 
 Apple's REST API does not expose playlist reordering, playlist deletion, or
 remove-track-from-playlist operations in this manifest snapshot. Those remain

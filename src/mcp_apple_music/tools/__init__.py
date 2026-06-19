@@ -12,8 +12,7 @@ from .personalization import register_personalization_tools
 from .playlists import register_playlist_tools
 from .search import register_search_tools
 
-EXTRA_TOOL_NAMES = frozenset({"get_library_playlist_folder"})
-TOOL_NAMES = frozenset(endpoint_tool_map().values()) | EXTRA_TOOL_NAMES
+TOOL_NAMES = frozenset(endpoint_tool_map().values())
 
 
 def register_tools(mcp: Any, get_client: ClientGetter) -> None:

@@ -9,6 +9,7 @@ from .common import (
     attributes_body,
     clamp,
     operation_report,
+    path_segment,
     relationship_body,
     require_values,
     validate_choice,
@@ -69,10 +70,10 @@ def register_playlist_tools(mcp: Any, get_client: ClientGetter) -> None:
         track_kind = validate_choice(track_type, PLAYLIST_TRACK_TYPES, "track_type")
         ids = require_values(track_ids, "track_ids")
         size = clamp(batch_size, 1, 100)
-        path = f"/me/library/playlists/{playlist_id}/tracks"
+        path = f"/me/library/playlists/{path_segment(playlist_id, 'playlist_id')}/tracks"
         batches = [ids[index : index + size] for index in range(0, len(ids), size)]
         request_bodies = [relationship_body(batch, track_kind) for batch in batches]
-        responses = [] if dry_run else await get_client().post_many(path, request_bodies)
+        outcomes = [] if dry_run else await get_client().post_many_outcomes(path, request_bodies)
         request_body = {"batches": request_bodies} if dry_run else None
 
         return {
@@ -82,7 +83,8 @@ def register_playlist_tools(mcp: Any, get_client: ClientGetter) -> None:
                 attempted_ids=ids,
                 dry_run=dry_run,
                 request_body=request_body,
-                responses=responses,
+                responses=[outcome["response"] for outcome in outcomes if outcome["success"]],
+                batch_outcomes=outcomes,
             ),
             "batch_size": size,
             "batch_count": len(batches),
