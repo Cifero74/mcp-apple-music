@@ -84,27 +84,56 @@ class AppleMusicClient:
     #  Pagination helper                                                   #
     # ------------------------------------------------------------------ #
 
+    async def get_url(self, url: str, user_auth: bool = True) -> dict:
+        """GET an absolute Apple Music API URL (e.g. a pagination `next` link)."""
+        headers = (
+            self.auth.get_auth_headers()
+            if user_auth
+            else self.auth.get_catalog_headers()
+        )
+        async with httpx.AsyncClient() as client:
+            response = await client.get(url, headers=headers, timeout=TIMEOUT)
+            response.raise_for_status()
+            return response.json()
+
     async def get_all_pages(
         self,
         path: str,
         params: Optional[dict[str, Any]] = None,
         max_items: int = 500,
         user_auth: bool = True,
+        page_size: int = 100,
     ) -> list[dict]:
-        """Fetch all pages of a paginated endpoint, up to max_items."""
+        """Fetch all pages of a paginated endpoint, up to max_items.
+
+        Prefers the API's `next` URL when present (Apple's recommended approach),
+        and falls back to incrementing `offset` otherwise.
+        """
         results: list[dict] = []
         offset = 0
-        page_size = 100
+        page_size = min(max(1, page_size), 100)
+        next_url: Optional[str] = None
 
         while len(results) < max_items:
-            page_params = {**(params or {}), "limit": page_size, "offset": offset}
-            data = await self.get(path, page_params, user_auth=user_auth)
+            if next_url:
+                data = await self.get_url(next_url, user_auth=user_auth)
+            else:
+                page_params = {
+                    **(params or {}),
+                    "limit": page_size,
+                    "offset": offset,
+                }
+                data = await self.get(path, page_params, user_auth=user_auth)
+
             items = data.get("data", [])
+            if not items:
+                break
+
             results.extend(items)
 
             # Check if there are more pages
             next_url = data.get("next")
-            if not next_url or not items:
+            if not next_url:
                 break
             offset += len(items)
 
