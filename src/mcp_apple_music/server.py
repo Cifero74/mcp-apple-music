@@ -318,26 +318,31 @@ async def get_library_playlists(limit: int = 100) -> str:
 
 
 @mcp.tool()
-async def get_playlist_tracks(playlist_id: str, limit: int = 100) -> str:
+async def get_playlist_tracks(playlist_id: str, limit: int = 100, offset: int = 0) -> str:
     """Get the tracks inside a specific playlist.
 
     Args:
         playlist_id: Library playlist ID (starts with 'p.').
                      Use get_library_playlists to find IDs.
         limit: Maximum tracks to return, 1–100 (default 100).
+        offset: Pagination offset for retrieving subsequent pages (default 0).
     """
     client = _get_client()
     data = await client.get(
         f"/me/library/playlists/{playlist_id}/tracks",
-        params={"limit": min(max(1, limit), 100)},
+        params={"limit": min(max(1, limit), 100), "offset": max(0, offset)},
     )
     tracks = data.get("data", [])
+    total = data.get("meta", {}).get("total", "?")
 
     if not tracks:
         return f"No tracks found in playlist '{playlist_id}'."
 
-    lines = [f"🎵 Tracks in playlist [{playlist_id}] — {len(tracks)} tracks:\n"]
-    for i, t in enumerate(tracks, 1):
+    lines = [
+        f"🎵 Tracks in playlist [{playlist_id}] — "
+        f"showing {offset + 1}–{offset + len(tracks)} of {total}:\n"
+    ]
+    for i, t in enumerate(tracks, offset + 1):
         a = t.get("attributes", {})
         lines.append(
             f"  {i}. {a.get('name', '?')} — {a.get('artistName', '?')}"
