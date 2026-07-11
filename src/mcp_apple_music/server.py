@@ -420,12 +420,13 @@ async def get_recently_played(limit: int = 10) -> str:
     playlists, stations) rather than individual tracks.
 
     Args:
-        limit: Number of items to return, 1–50 (default 10).
+        limit: Number of items to return, 1–10 (default 10).
+               The /me/recent/played endpoint rejects anything above 10.
     """
     client = _get_client()
     data = await client.get(
         "/me/recent/played",
-        params={"limit": min(max(1, limit), 50)},
+        params={"limit": min(max(1, limit), 10)},
     )
     items = data.get("data", [])
 
