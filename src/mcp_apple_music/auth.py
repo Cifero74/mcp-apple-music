@@ -23,7 +23,6 @@ import time
 from pathlib import Path
 from typing import Optional
 
-import jwt  # PyJWT
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "mcp-apple-music" / "config.json"
 
@@ -88,6 +87,8 @@ class AppleMusicAuth:
         # Regenerate when expired or within 5 minutes of expiry
         if self._developer_token and now < self._token_expiry - 300:
             return self._developer_token
+
+        import jwt  # PyJWT (deferred: keeps cryptography off the startup path)
 
         # Support both inline key content (env var) and file path (config.json)
         private_key_content = self.config.get("private_key_content")
