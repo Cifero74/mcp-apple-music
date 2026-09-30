@@ -34,3 +34,6 @@ config.json
 .pytest_cache/
 .coverage
 htmlcov/
+
+# MCP Registry publisher tokens
+.mcpregistry_*

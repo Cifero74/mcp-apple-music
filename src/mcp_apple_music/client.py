@@ -11,7 +11,8 @@ import httpx
 
 from .auth import AppleMusicAuth
 
-BASE_URL = "https://api.music.apple.com/v1"
+API_HOST = "https://api.music.apple.com"
+BASE_URL = f"{API_HOST}/v1"
 TIMEOUT = 30.0
 
 
@@ -85,7 +86,13 @@ class AppleMusicClient:
     # ------------------------------------------------------------------ #
 
     async def get_url(self, url: str, user_auth: bool = True) -> dict:
-        """GET an absolute Apple Music API URL (e.g. a pagination `next` link)."""
+        """GET an Apple Music API URL (e.g. a pagination `next` link).
+
+        Apple returns `next` as a host-relative path such as
+        '/v1/me/library/songs?offset=100', so prefix the API host when needed.
+        """
+        if url.startswith("/"):
+            url = f"{API_HOST}{url}"
         headers = (
             self.auth.get_auth_headers()
             if user_auth

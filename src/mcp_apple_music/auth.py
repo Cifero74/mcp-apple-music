@@ -23,7 +23,9 @@ import time
 from pathlib import Path
 from typing import Optional
 
-import jwt  # PyJWT
+# NOTE: PyJWT (and the cryptography backend it loads for ES256) is imported
+# lazily inside get_developer_token(). Importing it at module load can be slow
+# on first run and push server startup past the MCP client's init timeout.
 
 DEFAULT_CONFIG_PATH = Path.home() / ".config" / "mcp-apple-music" / "config.json"
 
@@ -101,6 +103,8 @@ class AppleMusicAuth:
                 private_key = f.read()
 
         expiry = int(now) + 15_777_000  # ≈ 6 months
+
+        import jwt  # PyJWT — lazy import, see note at top of module
 
         self._developer_token = jwt.encode(
             payload={

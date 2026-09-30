@@ -37,7 +37,7 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 
 - Python 3.10+
 - [uv](https://docs.astral.sh/uv/) (recommended) or pip
-- An **Apple Developer account** (free tier is fine) with a MusicKit key
+- A paid **Apple Developer Program** membership (99 USD/year) to create a MusicKit key. The free Apple Developer account can't create MusicKit keys.
 - An active **Apple Music subscription**
 
 ---
@@ -57,7 +57,7 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 ### 2. Clone and install
 
 ```bash
-git clone https://github.com/marioinghilleri/mcp-apple-music
+git clone https://github.com/Cifero74/mcp-apple-music
 cd mcp-apple-music
 
 # with uv (recommended)
