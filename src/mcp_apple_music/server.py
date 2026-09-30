@@ -318,26 +318,72 @@ async def get_library_playlists(limit: int = 100) -> str:
 
 
 @mcp.tool()
-async def get_playlist_tracks(playlist_id: str, limit: int = 100) -> str:
+async def get_playlist_tracks(
+    playlist_id: str,
+    limit: int = 100,
+    offset: int = 0,
+    fetch_all: bool = False,
+    max_tracks: int = 2000,
+) -> str:
     """Get the tracks inside a specific playlist.
+
+    Apple Music returns at most 100 tracks per request. Use ``offset`` to page
+    through a large playlist, or set ``fetch_all=True`` to automatically fetch
+    every page (up to ``max_tracks``).
 
     Args:
         playlist_id: Library playlist ID (starts with 'p.').
                      Use get_library_playlists to find IDs.
-        limit: Maximum tracks to return, 1–100 (default 100).
+        limit: Maximum tracks to return for a single page, 1–100 (default 100).
+               Ignored when fetch_all is True (always uses page size 100).
+        offset: Pagination offset for single-page requests (default 0).
+                Ignored when fetch_all is True.
+        fetch_all: If True, follow pagination and return every track in the
+                   playlist (up to max_tracks). Default False.
+        max_tracks: Safety cap when fetch_all is True, 1–5000 (default 2000).
     """
     client = _get_client()
-    data = await client.get(
-        f"/me/library/playlists/{playlist_id}/tracks",
-        params={"limit": min(max(1, limit), 100)},
-    )
-    tracks = data.get("data", [])
+    path = f"/me/library/playlists/{playlist_id}/tracks"
+    has_more = False
+    total_hint: object = "?"
+
+    if fetch_all:
+        cap = min(max(1, max_tracks), 5000)
+        tracks = await client.get_all_pages(path, max_items=cap, page_size=100)
+        # If we hit the safety cap, there may still be more tracks.
+        has_more = len(tracks) >= cap
+        start_index = 1
+    else:
+        page_limit = min(max(1, limit), 100)
+        page_offset = max(0, offset)
+        data = await client.get(
+            path,
+            params={"limit": page_limit, "offset": page_offset},
+        )
+        tracks = data.get("data", [])
+        total_hint = data.get("meta", {}).get("total", "?")
+        has_more = bool(data.get("next"))
+        start_index = page_offset + 1
 
     if not tracks:
         return f"No tracks found in playlist '{playlist_id}'."
 
-    lines = [f"🎵 Tracks in playlist [{playlist_id}] — {len(tracks)} tracks:\n"]
-    for i, t in enumerate(tracks, 1):
+    if fetch_all:
+        header = (
+            f"🎵 Tracks in playlist [{playlist_id}] — {len(tracks)} tracks"
+            + (" (capped; pass a higher max_tracks if incomplete)" if has_more else " (full playlist)")
+            + ":\n"
+        )
+    else:
+        end_index = start_index + len(tracks) - 1
+        more_note = " — more available via offset/fetch_all" if has_more else ""
+        header = (
+            f"🎵 Tracks in playlist [{playlist_id}] — showing {start_index}–{end_index}"
+            f" (total: {total_hint}){more_note}:\n"
+        )
+
+    lines = [header]
+    for i, t in enumerate(tracks, start_index):
         a = t.get("attributes", {})
         lines.append(
             f"  {i}. {a.get('name', '?')} — {a.get('artistName', '?')}"
