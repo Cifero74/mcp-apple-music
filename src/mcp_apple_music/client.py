@@ -81,8 +81,45 @@ class AppleMusicClient:
             response.raise_for_status()
             return response.json() if response.content else {}
 
+    async def put(
+        self,
+        path: str,
+        body: Optional[dict] = None,
+    ) -> dict:
+        """PUT request (always requires user auth).
+
+        Returns an empty dict for 204 No Content responses.
+        """
+        headers = {
+            **self.auth.get_auth_headers(),
+            "Content-Type": "application/json",
+        }
+        async with httpx.AsyncClient() as client:
+            response = await client.put(
+                f"{BASE_URL}{path}",
+                headers=headers,
+                json=body or {},
+                timeout=TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json() if response.content else {}
+
+    async def delete(self, path: str) -> dict:
+        """DELETE request (always requires user auth).
+
+        Returns an empty dict for 204 No Content responses.
+        """
+        async with httpx.AsyncClient() as client:
+            response = await client.delete(
+                f"{BASE_URL}{path}",
+                headers=self.auth.get_auth_headers(),
+                timeout=TIMEOUT,
+            )
+            response.raise_for_status()
+            return response.json() if response.content else {}
+
     # ------------------------------------------------------------------ #
-    #  Pagination helper                                                   #
+    #  Pagination helper                                                 #
     # ------------------------------------------------------------------ #
 
     async def get_url(self, url: str, user_auth: bool = True) -> dict:

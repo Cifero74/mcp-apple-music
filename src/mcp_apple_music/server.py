@@ -16,6 +16,9 @@ Tools provided:
   - add_tracks_to_playlist  Add songs to a playlist
   - get_recently_played     See what you listened to recently
   - get_recommendations     Get personalised Apple Music picks
+  - favorite_song           Mark a catalog song as favorite (star)
+  - unfavorite_song         Remove a catalog song from favorites
+  - get_song_favorite_status  Check which catalog songs are favorited
 """
 
 from mcp.server.fastmcp import FastMCP
@@ -550,6 +553,81 @@ async def get_recommendations(limit: int = 5) -> str:
             else:
                 lines.append(f"  {i}. 🎵 {name} | ID: {iid}")
 
+    return "\n".join(lines)
+
+
+# ------------------------------------------------------------------ #
+#  Tool: favorite_song                                                #
+# ------------------------------------------------------------------ #
+
+
+@mcp.tool()
+async def favorite_song(song_id: str) -> str:
+    """Mark a catalog song as favorite (the star in Apple Music).
+
+    Args:
+        song_id: Catalog song ID (use search_catalog to find it).
+    """
+    client = _get_client()
+    await client.put(
+        f"/me/ratings/songs/{song_id}",
+        {"type": "rating", "attributes": {"value": 1}},
+    )
+    return f"⭐ Song [{song_id}] added to favorites."
+
+
+# ------------------------------------------------------------------ #
+#  Tool: unfavorite_song                                              #
+# ------------------------------------------------------------------ #
+
+
+@mcp.tool()
+async def unfavorite_song(song_id: str) -> str:
+    """Remove a catalog song from favorites (clears its rating).
+
+    Args:
+        song_id: Catalog song ID.
+    """
+    client = _get_client()
+    await client.delete(f"/me/ratings/songs/{song_id}")
+    return f"✅ Song [{song_id}] removed from favorites."
+
+
+# ------------------------------------------------------------------ #
+#  Tool: get_song_favorite_status                                     #
+# ------------------------------------------------------------------ #
+
+
+@mcp.tool()
+async def get_song_favorite_status(song_ids: str) -> str:
+    """Check which catalog songs are marked as favorite.
+
+    Args:
+        song_ids: Comma-separated catalog song IDs (e.g. "1276760751,123").
+    """
+    ids = [i.strip() for i in song_ids.split(",") if i.strip()]
+    if not ids:
+        return "❌ No song IDs provided."
+
+    client = _get_client()
+    # Songs without a rating are simply absent from the response
+    data = await client.get("/me/ratings/songs", params={"ids": ",".join(ids)})
+
+    values = {
+        r.get("id"): r.get("attributes", {}).get("value")
+        for r in data.get("data", [])
+    }
+
+    lines = ["⭐ Favorite status:\n"]
+    for sid in ids:
+        value = values.get(sid)
+        if value == 1:
+            state = "⭐ favorited"
+        elif value == -1:
+            state = "👎 disliked"
+        else:
+            state = "not favorited"
+        lines.append(f"  {sid}: {state}")
     return "\n".join(lines)
 
 

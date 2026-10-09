@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.2.0] — 2026-10-09
+
+### Added
+- Favorites support: `favorite_song`, `unfavorite_song` and `get_song_favorite_status` (catalog songs, via `/v1/me/ratings/songs`).
+
+### Fixed
+- Setup wizard: calls `music.unauthorize()` before `authorize()`, so MusicKit JS no longer reuses a cached, revoked user token (API 403 "Invalid authentication").
+- Setup wizard: uses `ThreadingHTTPServer`, so a second browser tab no longer hangs.
+
 ## [1.1.0] — 2026-09-30
 
 ### Added
