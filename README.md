@@ -30,6 +30,9 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 | `add_tracks_to_playlist` | Add songs to a playlist (library or catalog tracks) |
 | `get_recently_played` | See recently played albums/playlists/stations |
 | `get_recommendations` | Get personalised Apple Music picks |
+| `favorite_song` | Mark a catalog song as favorite (star) |
+| `unfavorite_song` | Remove a catalog song from favorites |
+| `get_song_favorite_status` | Check which catalog songs are favorited |
 
 ---
 
@@ -133,7 +136,7 @@ mcp-apple-music/
 │       ├── __init__.py
 │       ├── auth.py      — Developer Token generation + User Token management
 │       ├── client.py    — Async HTTP client for api.music.apple.com
-│       ├── server.py    — FastMCP server with all 11 tools
+│       ├── server.py    — FastMCP server with all 14 tools
 │       └── setup.py     — One-time setup wizard (browser-based OAuth)
 ├── config.example.json  — Example config structure (no secrets)
 ├── pyproject.toml
