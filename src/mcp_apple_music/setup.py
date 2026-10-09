@@ -17,7 +17,7 @@ import sys
 import threading
 import time
 import webbrowser
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlparse
 
@@ -103,6 +103,8 @@ _HTML = """\
 
       try {
         const music     = MusicKit.getInstance();
+        // Drop any cached (possibly revoked) token so Apple issues a fresh one
+        try { await music.unauthorize(); } catch (_) {}
         const userToken = await music.authorize();
 
         status.textContent = 'Saving token…';
@@ -255,7 +257,7 @@ def main() -> None:
 
     # --- Start local HTTP server ------------------------------------ #
     _Handler.html = _HTML.replace("{{DEVELOPER_TOKEN}}", developer_token)
-    server = HTTPServer(("localhost", PORT), _Handler)
+    server = ThreadingHTTPServer(("localhost", PORT), _Handler)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
