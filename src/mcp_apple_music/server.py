@@ -17,15 +17,15 @@ Tools provided:
   - add_to_library          Save catalog songs, albums or playlists
   - get_recently_played     See what you listened to recently
   - get_recommendations     Get personalised Apple Music picks
-  - add_to_favorites        Mark songs, albums or playlists as favorite (star)
-  - remove_from_favorites   Remove songs, albums or playlists from favorites
-  - get_favorite_status     Check which songs, albums or playlists are favorited
+  - favorite_song           Mark a catalog song as favorite (star)
+  - unfavorite_song         Remove a catalog song from favorites
+  - get_song_favorite_status  Check which catalog songs are favorited
 """
 
 from mcp.server.fastmcp import FastMCP
 
 from .auth import AppleMusicAuth
-from .client import AppleMusicAPIError, AppleMusicClient
+from .client import AppleMusicClient
 
 # ------------------------------------------------------------------ #
 #  Initialise server, auth, and client (lazy — credentials loaded on  #
@@ -48,10 +48,10 @@ Guidelines:
   call search_catalog with types="playlists". Apple's editorial playlists
   have IDs starting with 'pl.'.
 - get_playlist_tracks reads both library ('p.') and catalog ('pl.') playlists.
-- To mark songs, albums or playlists as favorites (the star), use
-  add_to_favorites. To save them in the library without starring them, use
-  add_to_library. To put catalog songs into one of the user's playlists, use
-  add_tracks_to_playlist with track_type="songs".
+- To mark a song as favorite (the star), use favorite_song. To save songs,
+  albums or playlists in the library, use add_to_library. To put catalog
+  songs into one of the user's playlists, use add_tracks_to_playlist with
+  track_type="songs".
 - Playback (play, pause, skip, queue) is not available in this server.
 """
 
@@ -187,8 +187,7 @@ async def search_catalog(
                 f"  {i}. {a.get('name', '?')} — {a.get('curatorName', '')} | ID: {p.get('id', '?')}"
             )
         lines.append(
-            "\nOpen a playlist with get_playlist_tracks, star it with "
-            "add_to_favorites(playlist_ids=...), or save it with "
+            "\nOpen a playlist with get_playlist_tracks, or save it with "
             "add_to_library(playlist_ids=...)."
         )
 
@@ -465,10 +464,10 @@ async def get_playlist_tracks(
         )
     if is_catalog:
         lines.append(
-            "\nThese are catalog song IDs: star them with add_to_favorites, or "
-            "copy them into one of the user's playlists with "
-            "add_tracks_to_playlist(track_type='songs'). This playlist ID works "
-            "with add_to_favorites and add_to_library too."
+            "\nThese are catalog song IDs: star one with favorite_song, copy "
+            "them into one of the user's playlists with "
+            "add_tracks_to_playlist(track_type='songs'), or save the whole "
+            "playlist with add_to_library(playlist_ids=...)."
         )
     return "\n".join(lines)
 
@@ -701,147 +700,77 @@ async def get_recommendations(limit: int = 5) -> str:
 
 
 # ------------------------------------------------------------------ #
-#  Favorites (Apple Music ratings: value 1 = the favorite star)        #
+#  Tool: favorite_song                                                #
 # ------------------------------------------------------------------ #
 
-_KIND_LABEL = {
-    "songs": "song",
-    "library-songs": "song",
-    "albums": "album",
-    "library-albums": "album",
-    "playlists": "playlist",
-    "library-playlists": "playlist",
-}
 
+@mcp.tool()
+async def favorite_song(song_id: str) -> str:
+    """Mark a catalog song as favorite (the star in Apple Music).
 
-def _rating_targets(
-    song_ids: str, album_ids: str, playlist_ids: str
-) -> list[tuple[str, str]]:
-    """Map IDs to (ratings resource type, id).
-
-    Library IDs ('i.' songs, 'l.' albums, 'p.' playlists) use the library-*
-    ratings endpoints; catalog IDs (numeric, or 'pl.' playlists) the catalog ones.
+    Args:
+        song_id: Catalog song ID (use search_catalog to find it).
     """
-    targets = []
-    for sid in _split_ids(song_ids):
-        targets.append(("library-songs" if sid.startswith("i.") else "songs", sid))
-    for aid in _split_ids(album_ids):
-        targets.append(("library-albums" if aid.startswith("l.") else "albums", aid))
-    for pid in _split_ids(playlist_ids):
-        targets.append(
-            ("library-playlists" if pid.startswith("p.") else "playlists", pid)
-        )
-    return targets
+    client = _get_client()
+    await client.put(
+        f"/me/ratings/songs/{song_id}",
+        {"type": "rating", "attributes": {"value": 1}},
+    )
+    return f"⭐ Song [{song_id}] added to favorites."
 
 
-_NO_IDS = "❌ No IDs provided. Pass song_ids, album_ids and/or playlist_ids."
+# ------------------------------------------------------------------ #
+#  Tool: unfavorite_song                                              #
+# ------------------------------------------------------------------ #
 
 
 @mcp.tool()
-async def add_to_favorites(
-    song_ids: str = "",
-    album_ids: str = "",
-    playlist_ids: str = "",
-) -> str:
-    """Mark songs, albums or playlists as favorites (the star in Apple Music).
-
-    Works with catalog IDs (from search_catalog or a 'pl.' playlist) and with
-    library IDs (from the get_library_* tools).
+async def unfavorite_song(song_id: str) -> str:
+    """Remove a catalog song from favorites (clears its rating).
 
     Args:
-        song_ids: Comma-separated song IDs.
-        album_ids: Comma-separated album IDs.
-        playlist_ids: Comma-separated playlist IDs ('pl.' catalog or 'p.' library).
+        song_id: Catalog song ID.
     """
-    targets = _rating_targets(song_ids, album_ids, playlist_ids)
-    if not targets:
-        return _NO_IDS
-
     client = _get_client()
-    lines = ["⭐ Add to favorites:\n"]
-    for kind, item_id in targets:
-        label = _KIND_LABEL[kind]
-        try:
-            await client.put(
-                f"/me/ratings/{kind}/{item_id}",
-                {"type": "rating", "attributes": {"value": 1}},
-            )
-            lines.append(f"  ⭐ {label} [{item_id}] added to favorites")
-        except AppleMusicAPIError as e:
-            lines.append(f"  ❌ {label} [{item_id}] failed: {e}")
-    return "\n".join(lines)
+    await client.delete(f"/me/ratings/songs/{song_id}")
+    return f"✅ Song [{song_id}] removed from favorites."
+
+
+# ------------------------------------------------------------------ #
+#  Tool: get_song_favorite_status                                     #
+# ------------------------------------------------------------------ #
 
 
 @mcp.tool()
-async def remove_from_favorites(
-    song_ids: str = "",
-    album_ids: str = "",
-    playlist_ids: str = "",
-) -> str:
-    """Remove songs, albums or playlists from favorites.
-
-    This clears the item's rating, so it also removes a "dislike".
+async def get_song_favorite_status(song_ids: str) -> str:
+    """Check which catalog songs are marked as favorite.
 
     Args:
-        song_ids: Comma-separated song IDs.
-        album_ids: Comma-separated album IDs.
-        playlist_ids: Comma-separated playlist IDs ('pl.' catalog or 'p.' library).
+        song_ids: Comma-separated catalog song IDs (e.g. "1276760751,123").
     """
-    targets = _rating_targets(song_ids, album_ids, playlist_ids)
-    if not targets:
-        return _NO_IDS
+    ids = [i.strip() for i in song_ids.split(",") if i.strip()]
+    if not ids:
+        return "❌ No song IDs provided."
 
     client = _get_client()
-    lines = ["Remove from favorites:\n"]
-    for kind, item_id in targets:
-        label = _KIND_LABEL[kind]
-        try:
-            await client.delete(f"/me/ratings/{kind}/{item_id}")
-            lines.append(f"  ✅ {label} [{item_id}] removed from favorites")
-        except AppleMusicAPIError as e:
-            lines.append(f"  ❌ {label} [{item_id}] failed: {e}")
-    return "\n".join(lines)
+    # Songs without a rating are simply absent from the response
+    data = await client.get("/me/ratings/songs", params={"ids": ",".join(ids)})
 
-
-@mcp.tool()
-async def get_favorite_status(
-    song_ids: str = "",
-    album_ids: str = "",
-    playlist_ids: str = "",
-) -> str:
-    """Check which songs, albums or playlists are marked as favorite.
-
-    Args:
-        song_ids: Comma-separated song IDs (e.g. "1276760751,123").
-        album_ids: Comma-separated album IDs.
-        playlist_ids: Comma-separated playlist IDs ('pl.' catalog or 'p.' library).
-    """
-    targets = _rating_targets(song_ids, album_ids, playlist_ids)
-    if not targets:
-        return _NO_IDS
-
-    by_kind: dict[str, list[str]] = {}
-    for kind, item_id in targets:
-        by_kind.setdefault(kind, []).append(item_id)
-
-    client = _get_client()
-    values: dict[tuple[str, str], object] = {}
-    for kind, ids in by_kind.items():
-        # Items without a rating are simply absent from the response
-        data = await client.get(f"/me/ratings/{kind}", params={"ids": ",".join(ids)})
-        for r in data.get("data", []):
-            values[(kind, r.get("id"))] = r.get("attributes", {}).get("value")
+    values = {
+        r.get("id"): r.get("attributes", {}).get("value")
+        for r in data.get("data", [])
+    }
 
     lines = ["⭐ Favorite status:\n"]
-    for kind, item_id in targets:
-        value = values.get((kind, item_id))
+    for sid in ids:
+        value = values.get(sid)
         if value == 1:
             state = "⭐ favorited"
         elif value == -1:
             state = "👎 disliked"
         else:
             state = "not favorited"
-        lines.append(f"  {_KIND_LABEL[kind]} [{item_id}]: {state}")
+        lines.append(f"  {sid}: {state}")
     return "\n".join(lines)
 
 
