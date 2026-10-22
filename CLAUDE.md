@@ -34,6 +34,8 @@ MCP server for the Apple Music REST API (catalog search, library, playlists, fav
 - Ratings value `1` = favorite (the star in Apple Music); `-1` = dislike.
 - A 403 "Invalid authentication" on `/me/*` while catalog calls work means the Music User Token is dead. Fix: Mario reruns `uv run mcp-apple-music-setup` → `r` and logs in himself. Don't try to work around it in code.
 - MusicKit JS caches the user token in the browser. That's why the wizard calls `music.unauthorize()` before `authorize()` and uses `ThreadingHTTPServer` (with plain `HTTPServer`, a second tab hangs). Keep both.
+- `add_to_library` (`POST /me/library?ids[...]=...`, returns 202) can't be undone through the API: removing items needs the Music app. Don't live-test it on Mario's account without his OK.
+- Catalog playlists (`pl.` IDs) are read via `/catalog/{storefront}/playlists/{id}/tracks` with the developer token only (`user_auth=False`).
 - The REST API has no playback control (play/pause/queue), so don't add tools for it.
 - Never print, cat or log `~/.config/mcp-apple-music/config.json` or the `.p8` key. Also keep the repo-local `config.json` and `.mcpregistry_*` token files out of output and commits (they're gitignored; don't `git add -f`).
 - `timeout` isn't installed on this Mac. Use `perl -e 'alarm N; exec @ARGV' <cmd>`.

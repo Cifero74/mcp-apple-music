@@ -11,9 +11,10 @@ Tools provided:
   - get_library_albums      List albums in your library
   - get_library_artists     List artists in your library
   - get_library_playlists   List all your playlists
-  - get_playlist_tracks     Get tracks inside a playlist
+  - get_playlist_tracks     Get tracks inside a library or catalog playlist
   - create_playlist         Create a new playlist
   - add_tracks_to_playlist  Add songs to a playlist
+  - add_to_library          Save catalog songs, albums or playlists
   - get_recently_played     See what you listened to recently
   - get_recommendations     Get personalised Apple Music picks
   - favorite_song           Mark a catalog song as favorite (star)
@@ -31,10 +32,29 @@ from .client import AppleMusicClient
 #  first actual request, not at import time).                         #
 # ------------------------------------------------------------------ #
 
-mcp = FastMCP(
-    "apple-music",
-    instructions="Apple Music integration: search catalog, manage library and playlists.",
-)
+INSTRUCTIONS = """\
+Apple Music access for the user's own account. There are two separate worlds:
+
+- LIBRARY: what the user has saved. IDs start with 'i.', 'l.' or 'p.'.
+  Tools: search_library, get_library_songs/albums/artists/playlists.
+- CATALOG: everything on Apple Music. Songs and albums have numeric IDs,
+  playlists start with 'pl.'. Tool: search_catalog.
+
+Guidelines:
+- When the user asks for music, an artist, a genre, a mood or an activity,
+  search the catalog unless they clearly mean their own library. Never say
+  something doesn't exist after searching only the library.
+- For themed playlists (relax, focus, workout, party, a decade, a genre),
+  call search_catalog with types="playlists". Apple's editorial playlists
+  have IDs starting with 'pl.'.
+- get_playlist_tracks reads both library ('p.') and catalog ('pl.') playlists.
+- To keep catalog songs, albums or playlists, use add_to_library. To put
+  catalog songs into one of the user's playlists, use add_tracks_to_playlist
+  with track_type="songs".
+- Playback (play, pause, skip, queue) is not available in this server.
+"""
+
+mcp = FastMCP("apple-music", instructions=INSTRUCTIONS)
 
 _auth: AppleMusicAuth | None = None
 _client: AppleMusicClient | None = None
@@ -94,25 +114,50 @@ def _fmt_playlist(item: dict, index: int) -> str:
 # ------------------------------------------------------------------ #
 
 
+_CATALOG_TYPES = ("songs", "albums", "artists", "playlists")
+
+
+def _normalise_types(types: str) -> str:
+    """Accept 'playlist', 'Songs', ' albums ' etc. and drop unknown types."""
+    out = []
+    for raw in types.split(","):
+        t = raw.strip().lower()
+        if t and not t.endswith("s"):
+            t += "s"
+        if t in _CATALOG_TYPES and t not in out:
+            out.append(t)
+    return ",".join(out) or ",".join(_CATALOG_TYPES)
+
+
 @mcp.tool()
 async def search_catalog(
     query: str,
-    types: str = "songs,albums,artists",
+    types: str = "songs,albums,artists,playlists",
     limit: int = 5,
 ) -> str:
-    """Search the Apple Music catalog for songs, albums, artists, or playlists.
+    """Search all of Apple Music (not just the user's library) for songs,
+    albums, artists and playlists.
+
+    Use this whenever the user asks for music that may not be in their
+    library. For moods, genres, activities or eras (e.g. "relax", "workout",
+    "jazz anni 60") search with types="playlists" to find Apple's themed
+    playlists, then open one with get_playlist_tracks.
 
     Args:
-        query: Search term (e.g. "Radiohead", "Bohemian Rhapsody").
+        query: Search term (e.g. "Radiohead", "Bohemian Rhapsody", "relax").
         types: Comma-separated resource types to include.
-               Options: songs, albums, artists, playlists  (default: songs,albums,artists)
+               Options: songs, albums, artists, playlists (default: all four).
         limit: Results per type, 1–25 (default 5).
     """
     client = _get_client()
     storefront = client.auth.get_storefront()
     data = await client.get(
         f"/catalog/{storefront}/search",
-        params={"term": query, "types": types, "limit": min(max(1, limit), 25)},
+        params={
+            "term": query,
+            "types": _normalise_types(types),
+            "limit": min(max(1, limit), 25),
+        },
         user_auth=False,
     )
     results = data.get("results", {})
@@ -140,6 +185,10 @@ async def search_catalog(
             lines.append(
                 f"  {i}. {a.get('name', '?')} — {a.get('curatorName', '')} | ID: {p.get('id', '?')}"
             )
+        lines.append(
+            "\nOpen a playlist with get_playlist_tracks, or save it with "
+            "add_to_library(playlist_ids=...)."
+        )
 
     if len(lines) == 1:
         return f"No results found for '{query}'."
@@ -157,7 +206,9 @@ async def search_library(
     types: str = "library-songs,library-albums,library-artists,library-playlists",
     limit: int = 10,
 ) -> str:
-    """Search within your personal Apple Music library.
+    """Search only what the user has saved in their Apple Music library.
+
+    To search all of Apple Music, use search_catalog instead.
 
     Args:
         query: Search term.
@@ -194,7 +245,10 @@ async def search_library(
             lines.append(_fmt_playlist(p, i))
 
     if len(lines) == 1:
-        return f"Nothing found in your library for '{query}'."
+        return (
+            f"Nothing found in your library for '{query}'. "
+            "Try search_catalog to search all of Apple Music."
+        )
     return "\n".join(lines)
 
 
@@ -328,15 +382,17 @@ async def get_playlist_tracks(
     fetch_all: bool = False,
     max_tracks: int = 2000,
 ) -> str:
-    """Get the tracks inside a specific playlist.
+    """Get the tracks inside a playlist: one of the user's own playlists, or an
+    Apple Music catalog playlist (editorial, themed, curator playlists).
 
     Apple Music returns at most 100 tracks per request. Use ``offset`` to page
     through a large playlist, or set ``fetch_all=True`` to automatically fetch
     every page (up to ``max_tracks``).
 
     Args:
-        playlist_id: Library playlist ID (starts with 'p.').
-                     Use get_library_playlists to find IDs.
+        playlist_id: Library playlist ID (starts with 'p.', from
+                     get_library_playlists) or catalog playlist ID (starts
+                     with 'pl.', from search_catalog or get_recommendations).
         limit: Maximum tracks to return for a single page, 1–100 (default 100).
                Ignored when fetch_all is True (always uses page size 100).
         offset: Pagination offset for single-page requests (default 0).
@@ -346,13 +402,23 @@ async def get_playlist_tracks(
         max_tracks: Safety cap when fetch_all is True, 1–5000 (default 2000).
     """
     client = _get_client()
-    path = f"/me/library/playlists/{playlist_id}/tracks"
+    playlist_id = playlist_id.strip()
+    is_catalog = playlist_id.startswith("pl.")
+    if is_catalog:
+        storefront = client.auth.get_storefront()
+        path = f"/catalog/{storefront}/playlists/{playlist_id}/tracks"
+    else:
+        path = f"/me/library/playlists/{playlist_id}/tracks"
+    # Catalog endpoints only need the developer token
+    user_auth = not is_catalog
     has_more = False
     total_hint: object = "?"
 
     if fetch_all:
         cap = min(max(1, max_tracks), 5000)
-        tracks = await client.get_all_pages(path, max_items=cap, page_size=100)
+        tracks = await client.get_all_pages(
+            path, max_items=cap, page_size=100, user_auth=user_auth
+        )
         # If we hit the safety cap, there may still be more tracks.
         has_more = len(tracks) >= cap
         start_index = 1
@@ -362,6 +428,7 @@ async def get_playlist_tracks(
         data = await client.get(
             path,
             params={"limit": page_limit, "offset": page_offset},
+            user_auth=user_auth,
         )
         tracks = data.get("data", [])
         total_hint = data.get("meta", {}).get("total", "?")
@@ -391,6 +458,12 @@ async def get_playlist_tracks(
         lines.append(
             f"  {i}. {a.get('name', '?')} — {a.get('artistName', '?')}"
             f" | Type: {t.get('type', '?')} | ID: {t.get('id', '?')}"
+        )
+    if is_catalog:
+        lines.append(
+            "\nThese are catalog song IDs: use add_tracks_to_playlist with "
+            "track_type='songs' to copy them into one of the user's playlists, "
+            "or add_to_library with this playlist ID to save the whole playlist."
         )
     return "\n".join(lines)
 
@@ -441,7 +514,8 @@ async def add_tracks_to_playlist(
         playlist_id: The target playlist ID (starts with 'p.').
         track_ids: List of track IDs to add.
         track_type: 'library-songs' for tracks from your library (default),
-                    'songs' for catalog tracks found via search_catalog.
+                    'songs' for catalog tracks (from search_catalog or a
+                    catalog 'pl.' playlist).
     """
     if not track_ids:
         return "❌ No track IDs provided."
@@ -453,6 +527,71 @@ async def add_tracks_to_playlist(
     return (
         f"✅ Added {len(track_ids)} track(s) to playlist [{playlist_id}].\n"
         f"   Track IDs: {', '.join(track_ids)}"
+    )
+
+
+# ------------------------------------------------------------------ #
+#  Tool: add_to_library                                               #
+# ------------------------------------------------------------------ #
+
+
+def _split_ids(ids: str) -> list[str]:
+    return [i.strip() for i in ids.split(",") if i.strip()]
+
+
+@mcp.tool()
+async def add_to_library(
+    song_ids: str = "",
+    album_ids: str = "",
+    playlist_ids: str = "",
+) -> str:
+    """Save Apple Music catalog songs, albums or playlists into the user's library.
+
+    Use this when the user wants to keep something found with search_catalog,
+    get_playlist_tracks or get_recommendations. Saved playlists then appear in
+    get_library_playlists.
+
+    Args:
+        song_ids: Comma-separated catalog song IDs (numeric).
+        album_ids: Comma-separated catalog album IDs (numeric).
+        playlist_ids: Comma-separated catalog playlist IDs (start with 'pl.').
+    """
+    songs = _split_ids(song_ids)
+    albums = _split_ids(album_ids)
+    playlists = _split_ids(playlist_ids)
+
+    if not (songs or albums or playlists):
+        return "❌ No IDs provided. Pass song_ids, album_ids and/or playlist_ids."
+
+    library_ids = [i for i in songs + albums + playlists if i[:2] in ("i.", "l.", "p.")]
+    if library_ids:
+        return (
+            f"❌ These are library IDs, already in the user's library: "
+            f"{', '.join(library_ids)}. add_to_library needs catalog IDs "
+            "(numeric for songs/albums, 'pl.' for playlists) from search_catalog."
+        )
+
+    params = {}
+    if songs:
+        params["ids[songs]"] = ",".join(songs)
+    if albums:
+        params["ids[albums]"] = ",".join(albums)
+    if playlists:
+        params["ids[playlists]"] = ",".join(playlists)
+
+    client = _get_client()
+    await client.post("/me/library", params=params)
+
+    added = []
+    if songs:
+        added.append(f"{len(songs)} song(s)")
+    if albums:
+        added.append(f"{len(albums)} album(s)")
+    if playlists:
+        added.append(f"{len(playlists)} playlist(s)")
+    return (
+        f"✅ Added to your library: {', '.join(added)}.\n"
+        "   Apple Music can take a few seconds to show new items."
     )
 
 

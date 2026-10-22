@@ -25,9 +25,10 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 | `get_library_albums` | List albums in your library (paginated) |
 | `get_library_artists` | List artists in your library |
 | `get_library_playlists` | List all your playlists with IDs |
-| `get_playlist_tracks` | Get tracks inside a specific playlist |
+| `get_playlist_tracks` | Get tracks inside one of your playlists or an Apple Music catalog playlist (`pl.` IDs) |
 | `create_playlist` | Create a new playlist |
 | `add_tracks_to_playlist` | Add songs to a playlist (library or catalog tracks) |
+| `add_to_library` | Save catalog songs, albums or playlists into your library |
 | `get_recently_played` | See recently played albums/playlists/stations |
 | `get_recommendations` | Get personalised Apple Music picks |
 | `favorite_song` | Mark a catalog song as favorite (star) |

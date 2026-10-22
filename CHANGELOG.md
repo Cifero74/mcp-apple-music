@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.3.0] — 2026-10-22
+
+### Added
+- `get_playlist_tracks` reads Apple Music catalog playlists (`pl.` IDs from `search_catalog` or `get_recommendations`), not only your own playlists.
+- `add_to_library`: save catalog songs, albums or playlists into your library.
+
+### Changed
+- Server instructions and tool descriptions explain library vs catalog, so assistants search the catalog (including themed playlists) instead of stopping at the library.
+- `search_catalog` includes playlists by default and accepts `types` like `playlist` or `Songs`.
+- API errors are readable: an expired Music User Token, a wrong ID or a rate limit now come with a hint instead of a raw HTTP error.
+
 ## [1.2.0] — 2026-10-09
 
 ### Added
