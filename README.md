@@ -31,9 +31,9 @@ An **MCP (Model Context Protocol) server** that gives Claude full access to your
 | `add_to_library` | Save catalog songs, albums or playlists into your library |
 | `get_recently_played` | See recently played albums/playlists/stations |
 | `get_recommendations` | Get personalised Apple Music picks |
-| `favorite_song` | Mark a catalog song as favorite (star) |
-| `unfavorite_song` | Remove a catalog song from favorites |
-| `get_song_favorite_status` | Check which catalog songs are favorited |
+| `add_to_favorites` | Mark songs, albums or playlists as favorite (star) |
+| `remove_from_favorites` | Remove songs, albums or playlists from favorites |
+| `get_favorite_status` | Check which songs, albums or playlists are favorited |
 
 ---
 

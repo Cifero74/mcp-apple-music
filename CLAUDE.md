@@ -23,14 +23,14 @@ MCP server for the Apple Music REST API (catalog search, library, playlists, fav
    from mcp_apple_music import server as s
    async def main():
        print(await s.search_catalog("Lauryn Hill", types="songs", limit=2))
-       print(await s.get_song_favorite_status("1276760751"))
+       print(await s.get_favorite_status(song_ids="1276760751"))
    asyncio.run(main())
    '
    ```
    Use read-only calls only. Never change Mario's real favorites. To test write tools, use a throwaway song (e.g. `1276760752`, not favorited) and restore its original state afterwards.
 
 ## Gotchas
-- `GET /me/ratings/songs?ids=...` returns 200 with empty `data` for unrated songs; that response means "not favorited", not an error.
+- `GET /me/ratings/{songs|albums|playlists}?ids=...` returns 200 with empty `data` for unrated items; that response means "not favorited", not an error. Library IDs (`i.`, `l.`, `p.`) go to the `library-*` ratings endpoints.
 - Ratings value `1` = favorite (the star in Apple Music); `-1` = dislike.
 - A 403 "Invalid authentication" on `/me/*` while catalog calls work means the Music User Token is dead. Fix: Mario reruns `uv run mcp-apple-music-setup` → `r` and logs in himself. Don't try to work around it in code.
 - MusicKit JS caches the user token in the browser. That's why the wizard calls `music.unauthorize()` before `authorize()` and uses `ThreadingHTTPServer` (with plain `HTTPServer`, a second tab hangs). Keep both.

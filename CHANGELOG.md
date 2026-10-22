@@ -5,8 +5,10 @@
 ### Added
 - `get_playlist_tracks` reads Apple Music catalog playlists (`pl.` IDs from `search_catalog` or `get_recommendations`), not only your own playlists.
 - `add_to_library`: save catalog songs, albums or playlists into your library.
+- Favorites for albums and playlists too, from the catalog or your library.
 
 ### Changed
+- **Favorites tools renamed**: `favorite_song`, `unfavorite_song` and `get_song_favorite_status` are replaced by `add_to_favorites`, `remove_from_favorites` and `get_favorite_status`, which take `song_ids`, `album_ids` and `playlist_ids`.
 - Server instructions and tool descriptions explain library vs catalog, so assistants search the catalog (including themed playlists) instead of stopping at the library.
 - `search_catalog` includes playlists by default and accepts `types` like `playlist` or `Songs`.
 - API errors are readable: an expired Music User Token, a wrong ID or a rate limit now come with a hint instead of a raw HTTP error.
